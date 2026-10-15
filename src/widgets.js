@@ -1,169 +1,276 @@
 // -----------------------------------------------------------------------------
-// Dashboard widgets (SDK v0.14+, Gladys 5.1+).
+// Dashboard widget "Tractive pet": where the pet is (distance from home, at
+// home or not), its battery, its activity of the day, and two buttons to find
+// it (buzzer, light). Content in the core vocabulary, pre-localized from the
+// requesting user's language (the core caches it per language).
 //
-// A widget puts the integration's own data on the Gladys dashboard without a
-// dedicated core widget. The manifest `widgets` field declares its identity
-// (key, label, icon, optional per-instance `settings`); at runtime the
-// integration returns a DECLARATIVE content — `text`, `value`, `gauge`,
-// `status`, `chart`, `card-list`, `image`, `button` — that the core renders
-// with its own theme, dark mode and translations. No HTML, no CSS.
-//
-// Each entry of WIDGETS is keyed by the widget `key` and exposes:
-//   - get(gladys, { settings, language, units, config }): the content,
-//     registered by index.js with `gladys.onWidgetGet(key, ...)`;
-//   - action(gladys, { actionKey, params, settings, config }) (optional): a
-//     tapped `button` carrying an `action`, registered with
-//     `gladys.onWidgetAction`.
-//
-// Check your contents in the tests with `validateWidgetContent` (exported by
-// the SDK, see test/widgets.test.js), or run with DEBUG=gladys-integration-sdk
-// to have the SDK log every violation of the vocabulary and the budget.
+// The tiles are bound to the device features, so they follow the states live;
+// the status rows and the buttons follow the nudges hub.js sends.
 // -----------------------------------------------------------------------------
 
-import {
-  createLogger,
-  DEVICE_FEATURE_CATEGORIES,
-  DEVICE_TRANSPORTS,
-  WIDGET_COLORS,
-} from '@gladysassistant/integration-sdk';
-import { identifyDevice } from './devices/index.js';
-import { weatherStation } from './devices/weatherStation.js';
-import { plug } from './devices/plug.js';
-import { light } from './devices/light.js';
+import { WIDGET_COLORS } from '@gladysassistant/integration-sdk';
+import { deviceIds, featureKeys } from './devices.js';
+import { allLanguages } from './i18n.js';
+import { isOnline } from './tractive/status.js';
+import { WIDGET_KEY } from './hub.js';
 
-const logger = createLogger({ name: 'widgets' });
-
-// Widget key, as declared in the manifest `widgets` field.
-export const DEMO_STATUS_WIDGET = 'demo_status';
-
-// Keys of the `button` actions the demo_status content declares.
-const DEMO_STATUS_ACTIONS = { IDENTIFY_LIGHT: 'identify_light' };
-
-// How the plug transport reads in the status list.
-const TRANSPORT_STATUS = {
-  [DEVICE_TRANSPORTS.LOCAL]: { value: { en: 'Local', fr: 'Locale' }, color: WIDGET_COLORS.SUCCESS },
-  [DEVICE_TRANSPORTS.CLOUD]: { value: { en: 'Cloud', fr: 'Cloud' }, color: WIDGET_COLORS.INFO },
-  [DEVICE_TRANSPORTS.UNREACHABLE]: {
-    value: { en: 'Unreachable', fr: 'Injoignable' },
-    color: WIDGET_COLORS.DANGER,
+/** Texts of the widget, one table per language (labels ≤ 24, values ≤ 40). */
+export const TEXT = {
+  en: {
+    pick: 'Choose a pet in the settings of this widget.',
+    unknown: 'This pet is not known (yet): check the Tractive integration.',
+    distance: 'Distance',
+    battery: 'Battery',
+    activity: 'Activity',
+    atHome: 'At home',
+    yes: 'Yes',
+    no: 'No',
+    unknownValue: 'Unknown',
+    noHouse: 'No located house',
+    position: 'Position',
+    justNow: 'Just now',
+    minutesAgo: (minutes) => `${minutes} min ago`,
+    hoursAgo: (hours) => `${hours} h ago`,
+    daysAgo: (days) => `${days} day(s) ago`,
+    tracker: 'Tracker',
+    online: 'Online',
+    offline: 'Offline',
+    powerSaving: 'Power saving (home Wi-Fi)',
+    buzzer: 'Buzz',
+    stopBuzzer: 'Stop buzzer',
+    led: 'Light',
+    stopLed: 'Light off',
+  },
+  fr: {
+    pick: 'Choisissez un animal dans les réglages de ce widget.',
+    unknown: "Cet animal n'est pas (encore) connu : vérifiez l'intégration Tractive.",
+    distance: 'Distance',
+    battery: 'Batterie',
+    activity: 'Activité',
+    atHome: 'À la maison',
+    yes: 'Oui',
+    no: 'Non',
+    unknownValue: 'Inconnu',
+    noHouse: 'Aucune maison située',
+    position: 'Position',
+    justNow: "À l'instant",
+    minutesAgo: (minutes) => `Il y a ${minutes} min`,
+    hoursAgo: (hours) => `Il y a ${hours} h`,
+    daysAgo: (days) => `Il y a ${days} jour(s)`,
+    tracker: 'Traceur',
+    online: 'En ligne',
+    offline: 'Hors ligne',
+    powerSaving: 'Économie (Wi-Fi maison)',
+    buzzer: 'Faire sonner',
+    stopBuzzer: 'Arrêter le buzzer',
+    led: 'Allumer la LED',
+    stopLed: 'Éteindre la LED',
+  },
+  de: {
+    pick: 'Wähle in den Einstellungen dieses Widgets ein Tier aus.',
+    unknown: 'Dieses Tier ist (noch) nicht bekannt: Prüfe die Tractive-Integration.',
+    distance: 'Abstand',
+    battery: 'Batterie',
+    activity: 'Aktivität',
+    atHome: 'Zu Hause',
+    yes: 'Ja',
+    no: 'Nein',
+    unknownValue: 'Unbekannt',
+    noHouse: 'Kein Haus mit Standort',
+    position: 'Position',
+    justNow: 'Gerade eben',
+    minutesAgo: (minutes) => `Vor ${minutes} Min.`,
+    hoursAgo: (hours) => `Vor ${hours} Std.`,
+    daysAgo: (days) => `Vor ${days} Tag(en)`,
+    tracker: 'Tracker',
+    online: 'Online',
+    offline: 'Offline',
+    powerSaving: 'Energiesparen (WLAN zu Hause)',
+    buzzer: 'Summen',
+    stopBuzzer: 'Summer aus',
+    led: 'Licht an',
+    stopLed: 'Licht aus',
+  },
+  es: {
+    pick: 'Elija una mascota en los ajustes de este widget.',
+    unknown: 'Esta mascota no se conoce (todavía): compruebe la integración Tractive.',
+    distance: 'Distancia',
+    battery: 'Batería',
+    activity: 'Actividad',
+    atHome: 'En casa',
+    yes: 'Sí',
+    no: 'No',
+    unknownValue: 'Desconocido',
+    noHouse: 'Ninguna casa ubicada',
+    position: 'Posición',
+    justNow: 'Ahora mismo',
+    minutesAgo: (minutes) => `Hace ${minutes} min`,
+    hoursAgo: (hours) => `Hace ${hours} h`,
+    daysAgo: (days) => `Hace ${days} día(s)`,
+    tracker: 'Localizador',
+    online: 'En línea',
+    offline: 'Sin conexión',
+    powerSaving: 'Ahorro (wifi de casa)',
+    buzzer: 'Hacer sonar',
+    stopBuzzer: 'Parar zumbador',
+    led: 'Encender luz',
+    stopLed: 'Apagar luz',
   },
 };
 
-// A live tile references a feature by its external_id: read it from the
-// discovery payload itself, so the widget and the device never disagree.
-function featureExternalId(gladys, config, blueprint, category) {
-  const device = blueprint.buildDevice(gladys, config);
-  return device.features.find((feature) => feature.category === category).external_id;
+// Keys of the button actions (frozen once published).
+export const ACTIONS = { BUZZER: 'buzzer', LED: 'led' };
+
+const TTL_SECONDS = 300;
+
+function age(text, positionTime, now) {
+  const minutes = Math.max(0, Math.floor((now / 1000 - positionTime) / 60));
+  if (minutes < 1) return text.justNow;
+  if (minutes < 60) return text.minutesAgo(minutes);
+  if (minutes < 48 * 60) return text.hoursAgo(Math.floor(minutes / 60));
+  return text.daysAgo(Math.floor(minutes / 1440));
 }
 
-function plugConnectionStatus(gladys, config) {
-  const { transport, degraded } = plug.transport(gladys, config);
-  const { value, color } = TRANSPORT_STATUS[transport];
-  if (degraded) {
-    return {
-      value: { en: `${value.en} (degraded mode)`, fr: `${value.fr} (mode dégradé)` },
-      color: WIDGET_COLORS.WARNING,
-    };
+/** The widget content for one pet. */
+export function buildWidgetContent(hub, { settings = {}, language } = {}) {
+  const text = TEXT[language] ?? TEXT.en;
+  const message = (body) => ({
+    ttl_seconds: TTL_SECONDS,
+    components: [{ type: 'text', variant: 'body', text: body }],
+  });
+  if (!settings.device) {
+    return message(text.pick);
   }
-  return { value, color };
+  const pet = hub.petByDevice({ external_id: settings.device });
+  if (!pet) {
+    return message(text.unknown);
+  }
+  const ids = deviceIds(hub.gladys, pet.petId);
+  const keys = new Set(featureKeys(pet));
+  const presence = hub.presence.get(pet.petId) ?? { distance: null, atHome: null };
+  const components = [
+    { type: 'text', variant: 'heading', text: pet.name.slice(0, 40) },
+    {
+      type: 'value',
+      label: text.distance,
+      device_feature: ids.feature('distance'),
+      icon: 'map-pin',
+    },
+    { type: 'value', label: text.battery, device_feature: ids.feature('battery'), icon: 'battery' },
+  ];
+  if (keys.has('activity')) {
+    if (
+      Number.isFinite(pet.activityGoal) &&
+      pet.activityGoal > 0 &&
+      Number.isFinite(pet.activityMinutes)
+    ) {
+      components.push({
+        type: 'gauge',
+        label: text.activity,
+        value: pet.activityMinutes,
+        min: 0,
+        max: Math.max(pet.activityGoal, pet.activityMinutes),
+        unit: 'min',
+        color:
+          pet.activityMinutes >= pet.activityGoal ? WIDGET_COLORS.SUCCESS : WIDGET_COLORS.PRIMARY,
+      });
+    } else {
+      components.push({
+        type: 'value',
+        label: text.activity,
+        device_feature: ids.feature('activity'),
+        icon: 'activity',
+      });
+    }
+  }
+
+  const online = isOnline(pet);
+  components.push({
+    type: 'status',
+    items: [
+      {
+        label: text.atHome,
+        value: !hub.home
+          ? text.noHouse
+          : presence.atHome === null
+            ? text.unknownValue
+            : presence.atHome
+              ? text.yes
+              : text.no,
+        icon: 'home',
+        color:
+          presence.atHome === null
+            ? WIDGET_COLORS.NEUTRAL
+            : presence.atHome
+              ? WIDGET_COLORS.SUCCESS
+              : WIDGET_COLORS.WARNING,
+      },
+      {
+        label: text.position,
+        value:
+          pet.positionTime === null ? text.unknownValue : age(text, pet.positionTime, hub.now()),
+        icon: 'clock',
+        color: WIDGET_COLORS.NEUTRAL,
+      },
+      {
+        label: text.tracker,
+        value:
+          online === null
+            ? text.unknownValue
+            : !online
+              ? text.offline
+              : pet.powerSaving
+                ? text.powerSaving
+                : text.online,
+        icon: 'radio',
+        color:
+          online === null
+            ? WIDGET_COLORS.NEUTRAL
+            : online
+              ? WIDGET_COLORS.SUCCESS
+              : WIDGET_COLORS.DANGER,
+      },
+    ],
+  });
+
+  // A running function is shown by its icon, never by the button style: the
+  // `primary` style does not show in dark mode (Gladys#3153).
+  if (keys.has('buzzer')) {
+    components.push({
+      type: 'button',
+      label: pet.buzzer ? text.stopBuzzer : text.buzzer,
+      icon: pet.buzzer ? 'check-circle' : 'volume-2',
+      style: 'secondary',
+      action: { key: ACTIONS.BUZZER, params: { on: !pet.buzzer } },
+    });
+  }
+  if (keys.has('led')) {
+    components.push({
+      type: 'button',
+      label: pet.led ? text.stopLed : text.led,
+      icon: pet.led ? 'check-circle' : 'sun',
+      style: 'secondary',
+      action: { key: ACTIONS.LED, params: { on: !pet.led } },
+    });
+  }
+  return { ttl_seconds: TTL_SECONDS, components };
+}
+
+/** A tapped button: buzzer or light of the widget's pet. */
+export async function widgetAction(hub, { actionKey, params = {}, settings = {} }) {
+  const pet = hub.petByDevice({ external_id: settings.device });
+  if (!pet) {
+    return allLanguages('unknownPet');
+  }
+  const key = actionKey === ACTIONS.BUZZER ? 'buzzer' : actionKey === ACTIONS.LED ? 'led' : null;
+  if (!key) {
+    return undefined;
+  }
+  const on = params.on !== false;
+  await hub.command(pet, key, on);
+  return allLanguages(`${key}${on ? 'On' : 'Off'}`, pet.name);
 }
 
 export const WIDGETS = {
-  [DEMO_STATUS_WIDGET]: {
-    // `settings` holds the per-instance values of the declared `settings`
-    // (none here); `language` and `units` are those of the user viewing the
-    // dashboard, for the values you format yourself. Multi-language objects
-    // (`{ en, fr }`) are picked by the core, like everywhere else.
-    async get(gladys, { config }) {
-      logger.debug(`onWidgetGet <- ${DEMO_STATUS_WIDGET}`);
-      return {
-        // Reload policy: the computed parts below only change with the
-        // config, and index.js nudges the widget on every (re)connection and
-        // config update (see refreshWidgets) — the TTL is just a safety net.
-        ttl_seconds: 300,
-        components: [
-          // Device-bound tiles: LIVE, they follow the published states over
-          // the core's real-time path. No TTL, no nudge involved.
-          {
-            type: 'value',
-            label: { en: 'Temperature', fr: 'Température' },
-            icon: 'thermometer',
-            device_feature: featureExternalId(
-              gladys,
-              config,
-              weatherStation,
-              DEVICE_FEATURE_CATEGORIES.TEMPERATURE_SENSOR,
-            ),
-          },
-          {
-            type: 'value',
-            label: { en: 'Office plug', fr: 'Prise du bureau' },
-            icon: 'zap',
-            device_feature: featureExternalId(
-              gladys,
-              config,
-              plug,
-              DEVICE_FEATURE_CATEGORIES.ENERGY_SENSOR,
-            ),
-          },
-          // Computed rows: what the integration knows that no device feature
-          // carries. Served from the core cache until the TTL or a nudge.
-          {
-            type: 'status',
-            items: [
-              {
-                label: { en: 'Plug connection', fr: 'Connexion de la prise' },
-                icon: 'wifi',
-                ...plugConnectionStatus(gladys, config),
-              },
-              {
-                label: { en: 'Observed location', fr: 'Position observée' },
-                icon: 'map-pin',
-                value: `${config.latitude.toFixed(2)}, ${config.longitude.toFixed(2)}`,
-                color: WIDGET_COLORS.NEUTRAL,
-              },
-            ],
-          },
-          // `params` are declared HERE and sent back as-is: the handler never
-          // receives user input (a dashboard can hang on a public wall).
-          {
-            type: 'button',
-            label: { en: 'Identify the light', fr: 'Identifier la lampe' },
-            icon: 'eye',
-            style: 'secondary',
-            action: {
-              key: DEMO_STATUS_ACTIONS.IDENTIFY_LIGHT,
-              params: { device: light.deviceExternalId(gladys) },
-            },
-          },
-        ],
-      };
-    },
-
-    // Resolve an optional toast (string or multi-language object, ≤ 200
-    // characters). After a successful action the core drops the cached
-    // content and every open dashboard refetches it: no nudge needed.
-    async action(gladys, { actionKey, params, config }) {
-      logger.info(`onWidgetAction <- ${DEMO_STATUS_WIDGET}.${actionKey}`);
-      if (actionKey === DEMO_STATUS_ACTIONS.IDENTIFY_LIGHT) {
-        return identifyDevice(gladys, params.device, config);
-      }
-      // Throwing acks the action as failed: the message reaches the user.
-      throw new Error(`Unknown widget action: ${actionKey}`);
-    },
-  },
+  [WIDGET_KEY]: { get: buildWidgetContent, action: widgetAction },
 };
-
-/**
- * Freshness nudge: ask the core to re-pull every widget NOW instead of
- * waiting for the content TTL. Call it when you KNOW a computed content
- * changed (here: the config, which drives the plug transport and the observed
- * location) — and after every (re)connection, since the nudges are
- * fire-and-forget: rate-limited core-side to 1 per 10 s per widget, dropped
- * silently while disconnected.
- */
-export function refreshWidgets(gladys) {
-  for (const key of Object.keys(WIDGETS)) {
-    gladys.requestWidgetRefresh(key);
-  }
-}

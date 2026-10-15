@@ -1,0 +1,22 @@
+[
+  {
+    "_id": "PETDOG01",
+    "_type": "pet",
+    "_version": "1a2b3c"
+  },
+  {
+    "_id": "PETCAT02",
+    "_type": "pet",
+    "_version": "4d5e6f"
+  },
+  {
+    "_id": "PETSHR03",
+    "_type": "pet",
+    "_version": "7a8b9c"
+  },
+  {
+    "_id": "PETNOT04",
+    "_type": "pet",
+    "_version": "0d1e2f"
+  }
+]

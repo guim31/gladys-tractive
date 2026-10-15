@@ -1,0 +1,29 @@
+{
+  "message": "tracker_status",
+  "tracker_id": "TRDOG001",
+  "tracker_state": "OPERATIONAL",
+  "charging_state": "NOT_CHARGING",
+  "hardware": {
+    "time": 1716107000,
+    "battery_level": 95,
+    "power_saving_zone_id": null
+  },
+  "position": {
+    "time": 1716107000,
+    "latlong": [48.8566, 2.3522],
+    "accuracy": 10,
+    "sensor_used": "GPS"
+  },
+  "buzzer_control": {
+    "active": false,
+    "remaining": 0
+  },
+  "led_control": {
+    "active": false,
+    "remaining": 0
+  },
+  "live_tracking": {
+    "active": false,
+    "remaining": 0
+  }
+}
