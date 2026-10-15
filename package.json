@@ -1,8 +1,8 @@
 {
-  "name": "gladys-integration-template-js",
+  "name": "gladys-tractive",
   "version": "1.0.0",
   "private": true,
-  "description": "Official starter template to build an external integration for Gladys Assistant with the JavaScript SDK.",
+  "description": "Tractive GPS trackers for dogs and cats in Gladys Assistant (external integration).",
   "type": "module",
   "main": "index.js",
   "scripts": {

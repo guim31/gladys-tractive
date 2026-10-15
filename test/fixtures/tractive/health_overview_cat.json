@@ -1,0 +1,7 @@
+{
+  "petId": "PETCAT02",
+  "activity": {
+    "minutesGoal": 60,
+    "minutesActive": 25
+  }
+}

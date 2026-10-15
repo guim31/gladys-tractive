@@ -1,177 +1,453 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Tractive",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Tractive GPS trackers for dogs and cats: at home or not, distance, battery, activity, buzzer.",
+    "fr": "Traceurs GPS Tractive pour chiens et chats : maison ou non, distance, batterie, activité, buzzer.",
+    "de": "Tractive-GPS-Tracker für Hunde und Katzen: zu Hause oder nicht, Abstand, Batterie, Aktivität.",
+    "es": "Localizadores GPS Tractive para perros y gatos: en casa o no, distancia, batería, actividad."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
-  "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "docker_image": "ghcr.io/guim31/gladys-tractive:1.0.0",
+  "gladys_version": ">=5.2.0",
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-tractive/main/cover.png",
+  "categories": ["services", "security"],
+  "transports": ["cloud"],
+  "location": true,
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "Your Tractive account",
+        "fr": "Votre compte Tractive",
+        "de": "Dein Tractive-Konto",
+        "es": "Su cuenta Tractive"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "The e-mail address and password you use in the Tractive app. A tracker with an active subscription is needed. Unofficial integration, not affiliated with Tractive.",
+        "fr": "L'adresse e-mail et le mot de passe que vous utilisez dans l'appli Tractive. Il faut un traceur avec un abonnement actif. Intégration non officielle, sans lien avec Tractive.",
+        "de": "Die E-Mail-Adresse und das Passwort, die du in der Tractive-App verwendest. Ein Tracker mit aktivem Abo ist nötig. Inoffizielle Integration, nicht mit Tractive verbunden.",
+        "es": "La dirección de correo y la contraseña que usa en la aplicación Tractive. Se necesita un localizador con una suscripción activa. Integración no oficial, sin relación con Tractive."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://my.tractive.com/",
+          "label": {
+            "en": "Tractive web app",
+            "fr": "Appli web Tractive",
+            "de": "Tractive-Web-App",
+            "es": "Aplicación web de Tractive"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
+      "key": "email",
+      "type": "string",
+      "label": {
+        "en": "E-mail address",
+        "fr": "Adresse e-mail",
+        "de": "E-Mail-Adresse",
+        "es": "Dirección de correo"
       },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
+      "placeholder": {
+        "en": "e.g. name@example.com",
+        "fr": "ex. nom@example.com",
+        "de": "z. B. name@example.com",
+        "es": "p. ej. nombre@example.com"
+      },
       "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
+      "default": ""
     },
     {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
+      "key": "password",
+      "type": "secret",
+      "label": {
+        "en": "Password",
+        "fr": "Mot de passe",
+        "de": "Passwort",
+        "es": "Contraseña"
       },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
+      "description": {
+        "en": "Kept in the Gladys configuration only; the integration stores a session token in its /data volume, never the password.",
+        "fr": "Conservé dans la configuration de Gladys seulement ; l'intégration garde un jeton de session dans son volume /data, jamais le mot de passe.",
+        "de": "Nur in der Gladys-Konfiguration gespeichert; die Integration legt ein Sitzungstoken in ihrem /data-Volume ab, nie das Passwort.",
+        "es": "Solo se guarda en la configuración de Gladys; la integración guarda un token de sesión en su volumen /data, nunca la contraseña."
+      },
+      "required": true
     },
     {
-      "key": "unit",
+      "key": "home",
+      "type": "section",
+      "label": {
+        "en": "Home",
+        "fr": "Maison",
+        "de": "Zuhause",
+        "es": "Casa"
+      },
+      "description": {
+        "en": "The distance and \"at home\" are computed in Gladys from the location of a Gladys house (Settings, Houses). The position itself is never stored in Gladys.",
+        "fr": "La distance et « à la maison » sont calculées dans Gladys à partir de la position d'une maison de Gladys (Paramètres, Maisons). La position elle-même n'est jamais enregistrée dans Gladys.",
+        "de": "Abstand und „Zu Hause“ werden in Gladys aus dem Standort eines Gladys-Hauses berechnet (Einstellungen, Häuser). Die Position selbst wird nie in Gladys gespeichert.",
+        "es": "La distancia y «en casa» se calculan en Gladys a partir de la ubicación de una casa de Gladys (Ajustes, Casas). La posición en sí nunca se guarda en Gladys."
+      }
+    },
+    {
+      "key": "house",
       "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
-      "required": false,
-      "default": "celsius",
-      "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
-      ]
+      "source": "houses",
+      "label": {
+        "en": "House",
+        "fr": "Maison",
+        "de": "Haus",
+        "es": "Casa"
+      },
+      "description": {
+        "en": "Empty: the first house that has a location.",
+        "fr": "Vide : la première maison qui a une position.",
+        "de": "Leer: das erste Haus mit Standort.",
+        "es": "Vacío: la primera casa con ubicación."
+      },
+      "required": false
     },
     {
-      "key": "poll_frequency",
+      "key": "home_radius",
       "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "label": {
+        "en": "Home radius (m)",
+        "fr": "Rayon de la maison (m)",
+        "de": "Radius des Zuhauses (m)",
+        "es": "Radio de la casa (m)"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "Inside this distance the pet is at home. It counts as gone once 20 % farther (25 m at least), against GPS jitter.",
+        "fr": "En deçà de cette distance, l'animal est à la maison. Il est parti une fois 20 % plus loin (25 m au moins), contre les sauts du GPS.",
+        "de": "Innerhalb dieses Abstands ist das Tier zu Hause. Als weg gilt es erst 20 % weiter (mindestens 25 m), gegen GPS-Sprünge.",
+        "es": "Dentro de esta distancia la mascota está en casa. Se considera fuera a partir de un 20 % más lejos (25 m como mínimo), contra los saltos del GPS."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": 100,
+      "min": 20,
+      "max": 5000
+    },
+    {
+      "key": "battery_low_threshold",
+      "type": "number",
+      "label": {
+        "en": "Low battery threshold (%)",
+        "fr": "Seuil de batterie faible (%)",
+        "de": "Schwelle für schwache Batterie (%)",
+        "es": "Umbral de batería baja (%)"
+      },
+      "description": {
+        "en": "Below this level, the \"Tractive battery low\" scene trigger fires once.",
+        "fr": "Sous ce niveau, le déclencheur de scène « Batterie Tractive faible » se déclenche une fois.",
+        "de": "Unter diesem Wert löst der Szenen-Auslöser „Tractive-Batterie schwach“ einmal aus.",
+        "es": "Por debajo de este nivel, el disparador de escena «Batería Tractive baja» se activa una vez."
+      },
+      "required": false,
+      "default": 15,
+      "min": 5,
+      "max": 50
+    },
+    {
+      "key": "refresh_minutes",
+      "type": "number",
+      "label": {
+        "en": "Refresh interval (min)",
+        "fr": "Intervalle de rafraîchissement (min)",
+        "de": "Aktualisierungsintervall (Min.)",
+        "es": "Intervalo de actualización (min)"
+      },
+      "description": {
+        "en": "Positions and battery arrive in real time. This full refresh reads the activity and covers the moments without real time.",
+        "fr": "Positions et batterie arrivent en temps réel. Ce rafraîchissement complet lit l'activité et couvre les moments sans temps réel.",
+        "de": "Positionen und Batterie kommen in Echtzeit. Diese vollständige Aktualisierung liest die Aktivität und überbrückt Zeiten ohne Echtzeit.",
+        "es": "Las posiciones y la batería llegan en tiempo real. Esta actualización completa lee la actividad y cubre los momentos sin tiempo real."
+      },
+      "required": false,
+      "default": 15,
+      "min": 5,
+      "max": 60
+    },
+    {
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of the feature names",
+        "fr": "Langue des noms de fonctionnalités",
+        "de": "Sprache der Funktionsnamen",
+        "es": "Idioma de los nombres de funciones"
+      },
+      "description": {
+        "en": "Used for the devices added from now on, and for the command errors.",
+        "fr": "Utilisée pour les appareils ajoutés désormais, et pour les erreurs de commande.",
+        "de": "Gilt für die ab jetzt hinzugefügten Geräte und für die Fehler bei Befehlen.",
+        "es": "Se usa para los dispositivos añadidos a partir de ahora y para los errores de los comandos."
+      },
+      "required": false,
+      "default": "fr",
+      "options": [
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
+      ]
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
+      "key": "test_connection",
+      "label": {
+        "en": "Test the connection",
+        "fr": "Tester la connexion",
+        "de": "Verbindung testen",
+        "es": "Probar la conexión"
+      },
+      "description": {
+        "en": "Logs in to Tractive with the saved configuration and lists the pets found.",
+        "fr": "Se connecte à Tractive avec la configuration enregistrée et liste les animaux trouvés.",
+        "de": "Meldet sich mit der gespeicherten Konfiguration bei Tractive an und listet die gefundenen Tiere.",
+        "es": "Inicia sesión en Tractive con la configuración guardada y muestra las mascotas encontradas."
+      },
+      "timeout_seconds": 60
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "pet_left_home",
+      "label": {
+        "en": "Pet left home",
+        "fr": "Animal parti de la maison",
+        "de": "Tier hat das Zuhause verlassen",
+        "es": "La mascota ha salido de casa"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "A Tractive pet goes beyond the home radius. Imprecise positions are ignored.",
+        "fr": "Un animal Tractive dépasse le rayon de la maison. Les positions imprécises sont ignorées.",
+        "de": "Ein Tractive-Tier verlässt den Radius des Zuhauses. Ungenaue Positionen werden ignoriert.",
+        "es": "Una mascota Tractive sale del radio de la casa. Las posiciones imprecisas se ignoran."
       },
       "fields": [
         {
           "key": "device",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
-        },
-        {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
+          "label": {
+            "en": "Pet",
+            "fr": "Animal",
+            "de": "Tier",
+            "es": "Mascota"
+          },
+          "description": {
+            "en": "Empty: any pet.",
+            "fr": "Vide : n'importe quel animal.",
+            "de": "Leer: jedes Tier.",
+            "es": "Vacío: cualquier mascota."
+          }
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "pet_name",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Pet name",
+            "fr": "Nom de l'animal",
+            "de": "Name des Tiers",
+            "es": "Nombre de la mascota"
+          }
+        },
+        {
+          "key": "distance",
+          "type": "number",
+          "label": {
+            "en": "Distance from home (m)",
+            "fr": "Distance de la maison (m)",
+            "de": "Abstand zum Zuhause (m)",
+            "es": "Distancia a casa (m)"
+          }
         }
       ]
-    }
-  ],
-  "scene_actions": [
+    },
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "pet_came_home",
+      "label": {
+        "en": "Pet came home",
+        "fr": "Animal rentré à la maison",
+        "de": "Tier ist nach Hause gekommen",
+        "es": "La mascota ha vuelto a casa"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "A Tractive pet comes back inside the home radius.",
+        "fr": "Un animal Tractive revient dans le rayon de la maison.",
+        "de": "Ein Tractive-Tier kommt in den Radius des Zuhauses zurück.",
+        "es": "Una mascota Tractive vuelve al radio de la casa."
+      },
       "fields": [
         {
           "key": "device",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "label": {
+            "en": "Pet",
+            "fr": "Animal",
+            "de": "Tier",
+            "es": "Mascota"
+          },
+          "description": {
+            "en": "Empty: any pet.",
+            "fr": "Vide : n'importe quel animal.",
+            "de": "Leer: jedes Tier.",
+            "es": "Vacío: cualquier mascota."
+          }
         }
       ],
-      "outputs": [
+      "variables": [
         {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "key": "pet_name",
+          "type": "string",
+          "label": {
+            "en": "Pet name",
+            "fr": "Nom de l'animal",
+            "de": "Name des Tiers",
+            "es": "Nombre de la mascota"
+          }
+        },
+        {
+          "key": "distance",
+          "type": "number",
+          "label": {
+            "en": "Distance from home (m)",
+            "fr": "Distance de la maison (m)",
+            "de": "Abstand zum Zuhause (m)",
+            "es": "Distancia a casa (m)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "battery_low",
+      "label": {
+        "en": "Tractive battery low",
+        "fr": "Batterie Tractive faible",
+        "de": "Tractive-Batterie schwach",
+        "es": "Batería Tractive baja"
+      },
+      "description": {
+        "en": "A tracker drops below the threshold of the configuration, once, not while charging.",
+        "fr": "Un traceur passe sous le seuil de la configuration, une fois, pas pendant la charge.",
+        "de": "Ein Tracker fällt unter die Schwelle der Konfiguration, einmal, nicht beim Laden.",
+        "es": "Un localizador baja del umbral de la configuración, una vez, no mientras carga."
+      },
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Pet",
+            "fr": "Animal",
+            "de": "Tier",
+            "es": "Mascota"
+          },
+          "description": {
+            "en": "Empty: any pet.",
+            "fr": "Vide : n'importe quel animal.",
+            "de": "Leer: jedes Tier.",
+            "es": "Vacío: cualquier mascota."
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "pet_name",
+          "type": "string",
+          "label": {
+            "en": "Pet name",
+            "fr": "Nom de l'animal",
+            "de": "Name des Tiers",
+            "es": "Nombre de la mascota"
+          }
+        },
+        {
+          "key": "battery",
+          "type": "number",
+          "label": {
+            "en": "Battery (%)",
+            "fr": "Batterie (%)",
+            "de": "Batterie (%)",
+            "es": "Batería (%)"
+          }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "pet",
+      "label": {
+        "en": "Tractive pet",
+        "fr": "Animal Tractive",
+        "de": "Tractive-Tier",
+        "es": "Mascota Tractive"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "Distance, at home, battery and activity of a pet, with buzzer and light buttons.",
+        "fr": "Distance, maison, batterie et activité d'un animal, avec boutons buzzer et lumière.",
+        "de": "Abstand, zu Hause, Batterie und Aktivität eines Tiers, mit Summer- und Licht-Tasten.",
+        "es": "Distancia, en casa, batería y actividad de una mascota, con botones de zumbador y luz."
+      },
+      "icon": "map-pin",
+      "settings": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Pet",
+            "fr": "Animal",
+            "de": "Tier",
+            "es": "Mascota"
+          },
+          "required": true
+        }
+      ],
+      "action_timeout_seconds": 20
     }
   ]
 }

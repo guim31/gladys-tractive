@@ -1,67 +1,209 @@
-# Template de démonstration
+# Tractive
 
-Ceci est la documentation utilisateur de l'intégration. Gladys ré-héberge ce
-fichier et affiche un lien **Documentation** permanent vers lui dans l'écran
-de configuration (dans la langue de l'utilisateur, avec l'anglais en repli) —
-c'est au moment de configurer que l'utilisateur en a le plus besoin. Gardez
-les courtes indications d'accueil dans les blocs `section` du `config_schema`
-du manifest ; mettez ici le pas-à-pas détaillé (captures d'écran, dépannage…).
+Suivez le **traceur GPS Tractive** de votre chien ou de votre chat dans
+Gladys : est-il à la maison, à quelle distance, batterie, activité du jour, et
+le buzzer et la lumière pour le retrouver. Intégration non officielle, sans
+lien avec Tractive.
 
-## Ce que vous obtenez
+> **Développée sans le matériel : vos retours sont les bienvenus.**
+> L'intégration s'appuie sur l'API qu'utilise l'appli Tractive, telle que la
+> lisent la bibliothèque libre aiotractive et l'intégration Home Assistant, et
+> elle est testée sur leurs réponses enregistrées, pas sur un vrai traceur.
+> Dites ce qui marche et ce qui ne marche pas dans les
+> [issues](https://github.com/guim31/gladys-tractive/issues).
 
-Six appareils de démonstration apparaissent après l'installation : une
-station météo (vraies données Open-Meteo), un interrupteur, une lampe
-variable, une prise connectée avec mesure de puissance, un détecteur de
-mouvement et une caméra.
+## Présentation
+
+- **Un appareil par animal** équipé d'un traceur Tractive sur votre compte :
+  batterie, charge, distance de la maison, précision de la position, à la
+  maison ou non, traceur en ligne, économie d'énergie, activité et repos du
+  jour, objectif d'activité.
+- **Commandes** : suivi en direct, buzzer et lumière (LED), si le traceur et
+  l'abonnement le permettent.
+- **Temps réel** : batterie, positions et interrupteurs arrivent au fil de
+  l'eau, par le flux d'évènements qu'écoute l'appli Tractive.
+- **Déclencheurs de scène** : _Animal parti de la maison_, _Animal rentré à la
+  maison_, _Batterie Tractive faible_.
+- **Widget de tableau de bord** _Animal Tractive_, avec boutons buzzer et
+  lumière.
+
+La position elle-même (latitude, longitude) n'est jamais enregistrée dans
+Gladys, qui n'a pas de fonctionnalité pour cela : Gladys garde la **distance à
+votre maison**, calculée par l'intégration.
+
+## Prérequis
+
+- Gladys Assistant **5.2.0** ou plus récent.
+- Un traceur Tractive avec un **abonnement actif**, et l'adresse e-mail et le
+  mot de passe du compte Tractive auquel il appartient. Un compte créé avec
+  « Se connecter avec Apple » ou Google n'a pas de mot de passe : définissez-en
+  un d'abord dans l'appli Tractive (réglages du compte).
+- Pour la distance et « à la maison » : une maison de Gladys **avec une
+  position** (Paramètres → Maisons, placez la maison sur la carte).
+- Gladys doit accéder à Internet (`graph.tractive.com`,
+  `aps-api.tractive.com`, `channel.tractive.com`).
 
 ## Configuration
 
-1. Ouvrez l'onglet **Configuration** de l'intégration.
-2. Renseignez la **latitude** et la **longitude** que la station météo de
-   démonstration doit observer (Paris par défaut), et choisissez votre unité
-   de température. L'**intervalle de rafraîchissement** règle la fréquence
-   de lecture de la station météo et de la puissance de la prise : toutes
-   les 5 minutes par défaut, toutes les minutes au plus.
-3. Enregistrez : les appareils apparaissent dans l'onglet **Découverte**,
-   prêts à être ajoutés.
+1. Dans Gladys, ouvrez **Intégrations → Installer depuis GitHub** (ou le
+   catalogue) et installez **Tractive**. L'écran d'installation demande à lire
+   la position de vos maisons : elle sert à calculer la distance.
+2. Dans **Configuration**, renseignez :
+   - l'**Adresse e-mail** et le **Mot de passe** de votre compte Tractive ;
+   - la **Maison** depuis laquelle la distance est mesurée (vide : la première
+     maison qui a une position) ;
+   - le **Rayon de la maison (m)** : en deçà de cette distance, l'animal est à
+     la maison (100 m par défaut). Il est parti une fois 20 % plus loin (25 m
+     au moins), pour que les sauts du GPS en bordure ne le fassent pas aller et
+     venir ;
+   - le **Seuil de batterie faible (%)** : 15 % par défaut ;
+   - l'**Intervalle de rafraîchissement (min)** : le rafraîchissement complet
+     (15 min par défaut, de 5 à 60) ;
+   - la **Langue des noms de fonctionnalités** : français par défaut, utilisée
+     aussi pour les erreurs de commande.
+3. Enregistrez, puis utilisez **Tester la connexion** : il liste les animaux
+   trouvés.
+4. Ouvrez l'onglet **Découverte** et ajoutez vos animaux.
 
-Le réglage **Préférer la connexion locale** pilote la prise de
-démonstration : elle affiche en badge le canal réellement utilisé (local ou
-cloud), avec un point orange quand elle fonctionne en mode dégradé (local
-refusé, bascule cloud).
+L'intégration garde un jeton de session dans son propre volume `/data` : un
+redémarrage ne refait pas de connexion. Le mot de passe reste dans la
+configuration de Gladys.
 
-## Actions
+## Ce que fait chaque appareil
 
-- **Tester le fournisseur météo** — effectue une requête en direct vers
-  Open-Meteo et affiche la température et l'humidité actuelles sous le
-  bouton.
-- **Identifier un appareil** — choisissez un de vos appareils dans la liste
-  et il se signale (la lampe de démonstration « clignote » dans les logs).
+Un appareil par animal, au nom de l'animal. Les fonctionnalités dépendent du
+traceur : un traceur sans lumière n'a pas de fonctionnalité lumière, par
+exemple.
 
-## Scènes
+| Fonctionnalité               | Ce qu'elle montre                                                        |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| **Batterie**                 | Niveau de batterie du traceur (%)                                        |
+| **En charge**                | 1 pendant la charge (traceurs qui l'indiquent)                           |
+| **Distance de la maison**    | Distance entre la dernière position et la maison choisie (m)             |
+| **Précision de la position** | Incertitude de la dernière position, donnée par Tractive (m)             |
+| **À la maison**              | 1 dans le rayon de la maison, 0 en dehors                                |
+| **Traceur en ligne**         | 0 quand le traceur ne remonte plus rien ou a été éteint                  |
+| **Économie d'énergie**       | 1 quand le traceur économise sa batterie (en veille sur le Wi-Fi maison) |
+| **Activité aujourd'hui**     | Minutes actives depuis minuit                                            |
+| **Repos aujourd'hui**        | Minutes de calme depuis minuit (traceurs qui suivent le sommeil)         |
+| **Objectif d'activité**      | L'objectif réglé dans l'appli Tractive (minutes)                         |
+| **Suivi en direct**          | Interrupteur : mode suivi en direct, une position toutes les secondes    |
+| **Buzzer**                   | Interrupteur : le traceur sonne, pour retrouver l'animal tout près       |
+| **Lumière (LED)**            | Interrupteur : la lumière du traceur, pour voir l'animal dans le noir    |
 
-L'intégration ajoute ses propres cartes à l'éditeur de scènes (Gladys 5.1
-ou plus récent), dans la catégorie **Intégrations** :
+### Commandes
 
-- **Mouvement détecté** (déclencheur) — lance la scène quand un détecteur
-  de démonstration voit bouger quelque chose. Choisissez éventuellement le
-  détecteur et ce qui a bougé (personne, animal) ; laissés vides, toute
-  détection correspond. Les actions suivantes peuvent lire ce qui a bougé
-  avec `{{triggerEvent.data.target}}`.
-- **Identifier un appareil** (action) — fait se signaler l'appareil choisi.
-  Elle indique si l'appareil a pu se signaler, pour que les actions
-  suivantes puissent en dépendre.
+**Suivi en direct**, **Buzzer** et **Lumière (LED)** sont envoyés au traceur
+par Tractive. Le buzzer et la lumière s'arrêtent d'eux-mêmes au bout d'un
+moment sur le traceur ; Gladys les affiche éteints dès que Tractive le dit. Le
+suivi en direct vide la batterie : coupez-le une fois l'animal retrouvé.
 
-## Tableau de bord
+Une commande est refusée avec un message clair quand :
 
-Ajoutez le widget **État de la démo** à un tableau de bord : il affiche en
-direct la température de la station météo et la puissance de la prise du
-bureau, la connexion utilisée par la prise (en orange si dégradée) et la
-position observée. Son bouton **Identifier la lampe** fait se signaler la
-lampe de démonstration.
+- le traceur dort dans sa **zone d'économie d'énergie** (Wi-Fi de la maison) :
+  il n'y accepte pas de commande ;
+- l'**abonnement** ou le modèle de traceur ne permet pas la fonction ;
+- l'intégration n'est pas connectée à Tractive.
+
+Rien ici n'ouvre, ne déverrouille ni ne désarme quoi que ce soit.
+
+## Widget de tableau de bord
+
+Ajoutez le widget **Animal Tractive** à un tableau de bord et choisissez
+l'animal dans ses réglages. Il montre :
+
+- la distance de la maison et la batterie (en direct) ;
+- l'activité du jour face à l'objectif ;
+- à la maison ou non, l'âge de la dernière position, et l'état du traceur (en
+  ligne, hors ligne, économie d'énergie) ;
+- un bouton **buzzer** et un bouton **lumière** (si le traceur les a). Une
+  fonction en marche affiche une coche : appuyez de nouveau pour l'arrêter.
+
+## Déclencheurs de scène
+
+| Déclencheur                   | Quand                                                                                                    | Variables                     |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| **Animal parti de la maison** | L'animal dépasse le rayon de la maison plus la marge                                                     | nom de l'animal, distance (m) |
+| **Animal rentré à la maison** | L'animal revient dans le rayon de la maison                                                              | nom de l'animal, distance (m) |
+| **Batterie Tractive faible**  | La batterie passe sous le seuil, une fois (de nouveau seulement après 5 points au-dessus), pas en charge | nom de l'animal, batterie (%) |
+
+Chaque déclencheur peut se limiter à un animal (vide : n'importe lequel). Ils
+apportent aux fonctionnalités **À la maison** et **Batterie** ce qu'un état
+d'appareil ne dit pas : un évènement par vrai passage, le nom de l'animal pour
+un message, les positions moins précises que 500 m ignorées (une position par
+antenne relais ne fait jamais « partir » un chat endormi), rien sur la première
+valeur après un redémarrage.
+
+## Test de la connexion
+
+Le bouton **Tester la connexion** se connecte à Tractive avec la configuration
+enregistrée et répond avec les animaux trouvés, l'état des mises à jour en
+temps réel, et l'absence éventuelle de maison située. C'est aussi lui qui
+relance la connexion après un mot de passe refusé, une fois corrigé.
+
+## Exemples de scènes
+
+- **Le chien a fugué** : déclencheur _Animal parti de la maison_ pour le chien
+  → envoyer un message « {{triggerEvent.data.pet_name}} est parti,
+  à {{triggerEvent.data.distance}} m » → allumer _Suivi en direct_.
+- **Bon retour** : déclencheur _Animal rentré à la maison_ → éteindre _Suivi en
+  direct_ et envoyer « {{triggerEvent.data.pet_name}} est rentré ».
+- **Recharger le traceur** : déclencheur _Batterie Tractive faible_ → envoyer
+  « Rechargez le traceur de {{triggerEvent.data.pet_name}}
+  ({{triggerEvent.data.battery}} %) ».
+- **Contrôle du soir** : chaque soir à 22 h, si _À la maison_ vaut 0 → envoyer
+  un message.
+
+## Rafraîchissement et limites de l'API
+
+Tractive n'offre pas d'API publique : l'intégration utilise celle de l'appli
+Tractive, comme Home Assistant, et veille à ne pas la surcharger.
+
+- **Le temps réel d'abord** : une seule connexion longue au flux d'évènements
+  de Tractive apporte batterie, positions et interrupteurs. Perdue, elle se
+  reconnecte après 10 s, puis jusqu'à toutes les 5 minutes tant qu'elle échoue.
+- **Rafraîchissement complet** toutes les 15 minutes (réglable, de 5 à 60) :
+  traceur, batterie, position et activité des animaux **ajoutés à Gladys**
+  seulement, une requête après l'autre, 2 secondes entre deux animaux. Le
+  planificateur de Gladys n'est pas sollicité : l'intégration a son propre
+  minuteur.
+- **Une seule connexion au compte** par durée de vie du jeton : il est gardé
+  dans `/data` et renouvelé une heure avant d'expirer. Un mot de passe refusé
+  n'est pas réessayé tant que vous ne changez pas la configuration ou
+  n'appuyez pas sur **Tester la connexion**.
+- Une réponse « trop de requêtes » (429) est réessayée après 8 secondes, puis
+  jusqu'à 60 secondes, trois fois au plus.
+- Seules les valeurs qui changent sont envoyées à Gladys, plus un rappel toutes
+  les 6 heures des valeurs inchangées.
 
 ## Dépannage
 
-L'intégration journalise tout ce qu'elle fait : consultez les logs de
-l'intégration depuis l'interface Gladys (ou `docker logs` sur l'hôte) avec
-`LOG_LEVEL=debug` pour le détail complet.
+- **« Tractive refuse l'adresse e-mail ou le mot de passe »** : vérifiez-les
+  dans l'appli Tractive ou sur my.tractive.com. Un compte Google ou Apple a
+  besoin d'un mot de passe défini dans l'appli Tractive.
+- **Aucun animal dans Découverte** : l'animal doit avoir un traceur attribué
+  sur _votre_ compte ; un traceur partagé avec vous par un autre compte n'est
+  pas listé. Appuyez sur **Tester la connexion**.
+- **Distance et « À la maison » restent vides** : donnez une position à la
+  maison (Paramètres → Maisons), ou choisissez une maison située dans la
+  configuration.
+- **Une commande échoue** : lisez le message ; dans la zone Wi-Fi de la maison,
+  le traceur dort et n'accepte pas de commande.
+- **Les valeurs semblent anciennes** : le traceur remonte moins souvent en
+  économie d'énergie ; vérifiez-le dans l'appli Tractive. `LOG_LEVEL=debug`
+  sur l'intégration montre chaque mise à jour dans ses journaux.
+
+## Limites
+
+- **Développée sans le matériel** : testée seulement sur des réponses
+  enregistrées de l'API.
+- L'API est celle de l'appli Tractive, pas une API publique : Tractive peut la
+  changer sans prévenir et casser l'intégration jusqu'à sa mise à jour.
+- Pas de carte : Gladys n'a pas de fonctionnalité pour une position, seulement
+  la distance à une maison.
+- L'état des interrupteurs (buzzer, lumière, suivi en direct) n'est connu
+  qu'une fois signalé par le flux en temps réel.
+- L'activité est celle du jour, comptée par Tractive.
+- Un seul compte Tractive par Gladys.
+- Les zones (geofences), l'historique Tractive et les alertes santé de l'appli
+  ne sont pas disponibles.

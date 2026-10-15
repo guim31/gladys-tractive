@@ -1,33 +1,40 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeConfig, DEFAULT_CONFIG } from '../src/config.js';
+import { DEFAULT_CONFIG, hasCredentials, normalizeConfig } from '../src/config.js';
 
-test('normalizeConfig returns the defaults when called with no argument', () => {
+test('defaults for an empty config', () => {
   assert.deepEqual(normalizeConfig(), DEFAULT_CONFIG);
+  assert.equal(hasCredentials(normalizeConfig()), false);
 });
 
-test('normalizeConfig keeps user values over the defaults', () => {
-  const config = normalizeConfig({ latitude: 45.5, longitude: -73.6, unit: 'fahrenheit' });
-  assert.equal(config.latitude, 45.5);
-  assert.equal(config.longitude, -73.6);
-  assert.equal(config.unit, 'fahrenheit');
+test('values from the form are cleaned and bounded', () => {
+  const config = normalizeConfig({
+    email: '  pet.owner@example.com ',
+    password: ' secret with spaces ',
+    house: 'home',
+    home_radius: '150,6',
+    battery_low_threshold: 2,
+    refresh_minutes: 600,
+    language: 'de',
+  });
+  assert.equal(config.email, 'pet.owner@example.com');
+  assert.equal(config.password, ' secret with spaces ', 'a password is kept as typed');
+  assert.equal(config.home_radius, 151);
+  assert.equal(config.battery_low_threshold, 5);
+  assert.equal(config.refresh_minutes, 60);
+  assert.equal(config.language, 'de');
+  assert.equal(hasCredentials(config), true);
 });
 
-test('normalizeConfig coerces numeric strings coming from a form', () => {
-  const config = normalizeConfig({ latitude: '48.8', longitude: '2.3', poll_frequency: '600' });
-  assert.equal(config.latitude, 48.8);
-  assert.equal(config.longitude, 2.3);
-  assert.equal(config.poll_frequency, 600);
-  assert.equal(typeof config.poll_frequency, 'number');
-});
-
-test('normalizeConfig falls back to the default for a missing numeric field', () => {
-  const config = normalizeConfig({ unit: 'celsius' });
-  assert.equal(config.poll_frequency, DEFAULT_CONFIG.poll_frequency);
-});
-
-test('GLADYS_PREFER_LOCAL defaults to true and only an explicit false disables it', () => {
-  assert.equal(normalizeConfig().GLADYS_PREFER_LOCAL, true);
-  assert.equal(normalizeConfig({ GLADYS_PREFER_LOCAL: true }).GLADYS_PREFER_LOCAL, true);
-  assert.equal(normalizeConfig({ GLADYS_PREFER_LOCAL: false }).GLADYS_PREFER_LOCAL, false);
+test('invalid values fall back to the defaults', () => {
+  const config = normalizeConfig({
+    home_radius: 'far',
+    refresh_minutes: null,
+    language: 'it',
+    email: 42,
+  });
+  assert.equal(config.home_radius, 100);
+  assert.equal(config.refresh_minutes, 15);
+  assert.equal(config.language, 'fr');
+  assert.equal(config.email, '');
 });

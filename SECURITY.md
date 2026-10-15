@@ -30,6 +30,23 @@ Gladys before reporting a problem.
 
 In scope: the code of this repository and the Docker image it publishes.
 
+What the integration handles:
+
+- **Secrets**: the e-mail address and password of the Tractive account live in
+  the Gladys configuration (the password in a `secret` field, never sent back
+  to the browser). The integration never writes the password to disk and never
+  logs it, nor the e-mail address, nor the token.
+- **`/data`**: `tractive-token.json`, the Tractive session token (user id,
+  access token, expiry), bound to a hash of the e-mail address and readable by
+  the container user only. Deleting it only forces a new login.
+- **Network**: outbound HTTPS only, to `graph.tractive.com`,
+  `aps-api.tractive.com` and `channel.tractive.com`. No port is opened.
+- **Location**: the integration reads the coordinates of the Gladys houses
+  (`location: true`) to compute distances; positions of the pets stay in
+  memory and are never logged nor stored in Gladys, only the distance is.
+- **Commands**: live tracking, buzzer and light only. Nothing opens, unlocks
+  or disarms anything.
+
 Out of scope: Gladys Assistant itself (see its
 [security policy](https://github.com/GladysAssistant/Gladys/security/policy)),
-and the third-party services and devices the integration talks to.
+and Tractive's services and trackers.

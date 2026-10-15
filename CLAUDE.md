@@ -11,17 +11,21 @@ Gladys through
 [`@gladysassistant/integration-sdk`](https://github.com/GladysAssistant/integration-sdk-js),
 its only runtime dependency. It started from the official JavaScript template.
 
+This one follows **Tractive** GPS trackers (dogs, cats) through the cloud API
+of the Tractive app: see "Intégration Tractive" at the end of this file.
+
 ## Commands
 
 ```bash
 npm install
 npm test                                  # node --test, the built-in runner
-node --test test/devices.test.js          # one file
-node --test --test-name-pattern "plug"    # tests whose name matches
+node --test test/hub.test.js              # one file
+node --test --test-name-pattern "buzzer"  # tests whose name matches
 npm run lint                              # ESLint
 npm run format:check                      # Prettier, as the CI runs it
 npm run format                            # Prettier, fix in place
 npx github:GladysAssistant/integration-store .   # store admission checks
+node scripts/probe.mjs                    # real API, fake account, read-only (needs network)
 ```
 
 The CI (`.github/workflows/ci.yml`) runs `format:check`, `lint` and `test` on
@@ -31,16 +35,26 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+index.js                          SDK wiring only (src/app.js registers the handlers)
+src/app.js                        every SDK handler, waiting for the first start (whenReady)
+src/hub.js                        Tractive session, refresh timer, channel, presence, triggers, commands
+src/devices.js                    one Gladys device per pet: features (by capability) and states
+src/geo.js                        distance to the house, "at home" with hysteresis
+src/tractive/client.js            REST client: login, token, 429 backoff, endpoints, commands
+src/tractive/channel.js           real-time event stream (newline-delimited JSON, keep-alive)
+src/tractive/status.js            pet status merged from REST and events (aiotractive rules)
+src/tractive/errors.js            TractiveError by kind (unauthorized, forbidden, network...)
+src/tokenStore.js                 the Tractive token in /data, bound to a hash of the e-mail
+src/widgets.js                    "Tractive pet" dashboard widget (manifest `widgets`)
+src/i18n.js                       feature names, connection statuses, messages (en, fr, de, es)
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
-gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
+src/issues.js                     deduplicated problem logging (one line on failure, one on recovery)
+scripts/probe.mjs                 read-only probe of the real API (orchestrator, with network)
+gladys-assistant-integration.json manifest: name, config_schema, actions, triggers, widget...
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys, same sections
 test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+test/helpers/fakeTractive.js      simulated Tractive cloud (REST + channel stream) behind fetch
+test/fixtures/tractive/           recorded API answers (aiotractive, Home Assistant), anonymized
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -67,11 +81,14 @@ test/                             node --test, against the SDK's fake Gladys (in
   catalog `description` holds 10 to 100 characters per language. A field the
   older cores do not know needs a higher `gladys_version` minimum
   (`categories`: 4.86.0; `widgets`, `scene_triggers`, `scene_actions`,
-  `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
+  `type: "provider"`: 5.1.0; `source: "houses"`: 5.2.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** exists in four languages (English, French, German with
+  "du", Spanish with "usted"): manifest texts, feature names, action and
+  command messages, widget content, and `docs/en.md`, `docs/fr.md`,
+  `docs/de.md`, `docs/es.md` with the same sections. `test/i18n.test.js`
+  enforces it.
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -233,3 +250,53 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## Intégration Tractive (15/10/2026)
+
+**API** (non publique, celle de l'appli Tractive, lue par aiotractive MIT et l'intégration HA) :
+
+- Connexion `POST https://graph.tractive.com/4/auth/token`, corps
+  `{ platform_email, platform_token: <mot de passe>, grant_type: "tractive" }`, en-tête
+  `x-tractive-client`. Réponse `{ user_id, access_token, expires_at }` (secondes). Requêtes suivantes :
+  `x-tractive-user` + `authorization: Bearer`. 401/403 à la connexion = identifiants refusés.
+- `CLIENT_ID` : celui par défaut d'aiotractive (`625e533d…a669f0`). Celui de HA (`…a669f1`) a été donné
+  par Tractive à Home Assistant seul : **ne jamais le reprendre**.
+- REST : `user/<uid>/trackable_objects`, `trackable_object/<pet>` (`device_id`, `details.name` ; `details`
+  vide = traceur partagé par un autre compte, ignoré), `tracker/<id>` (`capabilities`, `state`,
+  `state_reason`, `charging_state`), `device_hw_report/<id>/` (barre finale obligatoire),
+  `device_pos_report/<id>` (`latlong`, `pos_uncertainty`), santé sur
+  `https://aps-api.tractive.com/api/1/pet/<pet>/health/overview` (400 sans suivi, 403 abonnement inactif :
+  lu comme vide). Commandes : `GET tracker/<id>/command/{buzzer_control|led_control|live_tracking}/{on|off}`
+  → `{ pending: true }`.
+- Flux temps réel : `POST https://channel.tractive.com/3/channel`, une ligne JSON par message
+  (`handshake`, `keep-alive`, `tracker_status`, `health_overview` avec `content.petId`). Tractive coupe
+  le flux de temps en temps sans fin propre : se reconnecter tout de suite si des données sont passées.
+- Un buzzer ou une LED expirés restent `active: true` avec `remaining: 0` : les lire éteints.
+- HA rend les interrupteurs indisponibles dans la **zone d'économie d'énergie** (`power_saving_zone_id`
+  non nul) : on refuse la commande avec un message clair.
+
+**Choix** :
+
+- L'appareil est l'**animal** (`externalIds('pet', petId)`), pas le traceur : un traceur remplacé garde
+  l'historique. Fonctionnalités selon `capabilities` (`LT`, `BUZZER`, `LED`, `ACTIVITY_TRACKING`,
+  `SLEEP_TRACKING`) et la présence de `charging_state` : jamais selon la config.
+- Gladys n'a **aucune fonctionnalité latitude/longitude** (vérifié dans la table du cœur 5.2.1) :
+  distance à une maison choisie (`source: "houses"` → `gladys_version >=5.2.0`, et `location: true`
+  pour lire ses coordonnées par `getHouses()`), calculée dans le conteneur. La position ne quitte
+  jamais la mémoire, ni journaux ni Gladys.
+- « À la maison » : entrée sous le rayon, sortie au-delà de rayon + max(25 m, 20 %), positions moins
+  précises que 500 m ignorées pour les transitions. Déclencheurs une fois par passage, jamais sur la
+  première valeur ; batterie faible une fois par franchissement, réarmée 5 points au-dessus, pas en
+  charge.
+- `should_poll: false` ; minuteur interne (15 min par défaut) qui ne lit que les animaux ajoutés,
+  2 s entre deux animaux ; `onPoll` de repli (90 % d'une période).
+- Un mot de passe refusé n'est **jamais réessayé** seul (risque de blocage du compte) : seulement
+  après une nouvelle config ou le bouton « Tester la connexion ».
+
+**Pièges découverts** :
+
+- `mkdir -p` sous `/proc` reste bloqué dans le bac à sable des sessions de code : pour tester un
+  `/data` non inscriptible, utiliser un fichier comme dossier (ENOTDIR).
+- Les types génériques des capteurs (`decimal`, `binary` de `distance-sensor`, `presence-sensor`)
+  sont sous `DEVICE_FEATURE_TYPES.SENSOR` dans le SDK, pas sous une clé par catégorie.
+- La règle ESLint 10 `preserve-caught-error` exige `{ cause }` quand on relance une erreur traduite.
