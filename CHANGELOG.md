@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-15
+
 ### Added
 
 - Tractive GPS trackers for dogs and cats, through the Tractive account
@@ -28,4 +30,5 @@ the notes of the version's GitHub Release.
 - Feature names, messages and documentation in English, French, German and
   Spanish.
 
-[Unreleased]: https://github.com/guim31/gladys-tractive/commits/main
+[Unreleased]: https://github.com/guim31/gladys-tractive/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/guim31/gladys-tractive/releases/tag/v1.0.1

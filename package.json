@@ -1,6 +1,6 @@
 {
   "name": "gladys-tractive",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Tractive GPS trackers for dogs and cats in Gladys Assistant (external integration).",
   "type": "module",
